@@ -94,13 +94,26 @@ def initialize_ray_cluster(
             "Ray is not installed. Please install Ray to use distributed "
             "serving.")
 
-    # Connect to a ray cluster.
-    if is_hip():
-        ray.init(address=ray_address,
-                 ignore_reinit_error=True,
-                 num_gpus=parallel_config.world_size)
+    # fix for https://github.com/vllm-project/vllm/issues/1058
+    if "SLURM_JOB_ID" in os.environ:
+        num_cpus = int(os.environ.get('SLURM_CPUS_PER_TASK'))
+        # Connect to a ray cluster.
+        if is_hip(): 
+            ray.init(num_cpus=num_cpus,
+                    address=ray_address,
+                    ignore_reinit_error=True,
+                    num_gpus=parallel_config.world_size)
+        else:
+            ray.init(num_cpus=num_cpus, address=ray_address, ignore_reinit_error=True)
     else:
-        ray.init(address=ray_address, ignore_reinit_error=True)
+        # Connect to a ray cluster.
+        if is_hip():
+            ray.init(address=ray_address,
+                    ignore_reinit_error=True,
+                    num_gpus=parallel_config.world_size)
+        else:
+            ray.init(address=ray_address, ignore_reinit_error=True)
+
 
     if parallel_config.placement_group:
         # Placement group is already set.
